@@ -4,6 +4,7 @@ from typing import List
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from database import engine, get_db
 from models import Base, Contact, Ticket, TicketStatus
@@ -26,7 +27,7 @@ async def health():
 # GET /api/v1/tickets
 @app.get("/api/v1/tickets", response_model=List[TicketResponse])
 async def get_tickets(db: AsyncSession = Depends(get_db)):
-    query = select(Ticket)
+    query = select(Ticket).options(selectinload(Ticket.contact))
 
     results = await db.execute(query)
 
@@ -54,14 +55,14 @@ async def create_ticket(data: TicketCreate, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
 
-    await db.refresh(ticket)
+    await db.refresh(ticket, attribute_names=["contact"])
 
     return ticket
 
 # PATCH /api/v1/tickets/{ticket_id}/resolve
 @app.patch("/api/v1/tickets/{ticket_id}/resolve", response_model=TicketResponse)
 async def resolve_ticket(ticket_id: int, db: AsyncSession = Depends(get_db)):
-    query = select(Ticket).where(Ticket.id == ticket_id)
+    query = select(Ticket).options(selectinload(Ticket.contact)).where(Ticket.id == ticket_id)
 
     result = await db.execute(query)
 
@@ -74,5 +75,5 @@ async def resolve_ticket(ticket_id: int, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
 
-    await db.refresh(ticket)
+    await db.refresh(ticket, attribute_names=["contact"])
     return ticket

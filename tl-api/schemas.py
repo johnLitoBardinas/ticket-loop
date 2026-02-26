@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from html import escape
+
+from pydantic import BaseModel, EmailStr, field_validator
 
 from models import TicketStatus
 
@@ -24,6 +26,16 @@ class TicketCreate(BaseModel):
     email: EmailStr
     issue_description: str
 
+    @field_validator("full_name", "issue_description")
+    @classmethod
+    def sanitize_string(cls, v: str) -> str:
+        return escape(v.strip())
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: str) -> str:
+        return escape(v.strip().lower())
+
 
 class TicketResponse(BaseModel):
     id: int
@@ -31,5 +43,6 @@ class TicketResponse(BaseModel):
     issue_description: str
     status: TicketStatus
     created_at: datetime
+    contact: ContactResponse
 
     model_config = {"from_attributes": True}
