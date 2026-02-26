@@ -1,10 +1,16 @@
 from contextlib import asynccontextmanager
 from typing import List
+import logging
 
+import httpx
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
+
+WEBHOOK_URL = "http://host.docker.internal:9999/api/webhook/ticket-created"
 
 from database import engine, get_db
 from models import Base, Contact, Ticket, TicketStatus
@@ -56,6 +62,14 @@ async def create_ticket(data: TicketCreate, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     await db.refresh(ticket, attribute_names=["contact"])
+
+    ticket_data = TicketResponse.model_validate(ticket).model_dump(mode="json")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(WEBHOOK_URL, json=ticket_data, timeout=10.0)
+    except httpx.RequestError as e:
+        logger.error(f"Webhook notification failed: {e}")
 
     return ticket
 
